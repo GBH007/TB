@@ -1,11 +1,15 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"log"
 	"math/rand"
 	"os"
+	"strconv"
+	"strings"
 )
 
 const (
@@ -101,8 +105,46 @@ func (c *Controller) generateData() {
 		c.data.Items = append(c.data.Items, item)
 	}
 }
+
+type GUI struct {
+	scanner    *bufio.Scanner
+	controller *Controller
+}
+
+func NewGUI(cnt *Controller) *GUI {
+	g := new(GUI)
+	g.scanner = bufio.NewScanner(os.Stdin)
+	g.controller = cnt
+	return g
+}
+func (g *GUI) text() string {
+	g.scanner.Scan()
+	return g.scanner.Text()
+}
+func (g *GUI) getMenuAnsven(v []string, title string, info []string) int {
+	ok := false
+	for !ok {
+		fmt.Println(strings.Repeat("*", len(title)+2))
+		fmt.Printf("*%s*\n", title)
+		fmt.Println(strings.Repeat("*", len(title)+2))
+		for _, s := range info {
+			fmt.Printf("(%s)\n", s)
+		}
+		for i, s := range v {
+			fmt.Printf("%d->%s\n", i, s)
+		}
+		if slc, err := strconv.Atoi(g.text()); err == nil {
+			ok = true
+			return slc
+		}
+	}
+	return -1
+}
+
 func main() {
 	c := NewConroller("db.json")
 	c.generateData()
 	c.Save()
+	g := NewGUI(c)
+	g.getMenuAnsven([]string{"sel1", "sel2"}, "TB GO", []string{"info1"})
 }
