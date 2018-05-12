@@ -121,20 +121,26 @@ func (g *GUI) text() string {
 	g.scanner.Scan()
 	return g.scanner.Text()
 }
-func (g *GUI) getMenuAnsven(v []string, title string, info []string) int {
-	ok := false
-	for !ok {
-		fmt.Println(strings.Repeat("*", len(title)+2))
-		fmt.Printf("*%s*\n", title)
-		fmt.Println(strings.Repeat("*", len(title)+2))
-		for _, s := range info {
+func (g *GUI) printHead(title string) {
+	fmt.Println(strings.Repeat("*", len(title)+2))
+	fmt.Printf("*%s*\n", title)
+	fmt.Println(strings.Repeat("*", len(title)+2))
+}
+func (g GUI) printList(list []string, numerated bool) {
+	for i, s := range list {
+		if numerated {
+			fmt.Printf("%d->%s\n", i, s)
+		} else {
 			fmt.Printf("(%s)\n", s)
 		}
-		for i, s := range v {
-			fmt.Printf("%d->%s\n", i, s)
-		}
+	}
+}
+func (g *GUI) getMenuAnsven(v []string, title string, info []string) int {
+	for true {
+		g.printHead(title)
+		g.printList(info, false)
+		g.printList(v, true)
 		if slc, err := strconv.Atoi(g.text()); err == nil {
-			ok = true
 			return slc
 		}
 	}
