@@ -52,7 +52,7 @@ type User struct {
 	Tanks []*Tank `json:"tanks"`
 }
 type Data struct {
-	User  User    `json:"user"`
+	User  *User   `json:"user"`
 	Items []*Item `json:"items"`
 }
 type Controller struct {
@@ -94,6 +94,7 @@ func (c *Controller) save(filename string) error {
 }
 func (c *Controller) makeData() {
 	c.data = new(Data)
+	c.data.User = new(User)
 	c.data.User.Money = 1000
 	c.data.User.Items = make([]*Item, 0)
 	c.data.User.Tanks = make([]*Tank, 0)
@@ -101,7 +102,7 @@ func (c *Controller) makeData() {
 }
 func (c *Controller) generateData() {
 	c.makeData()
-	for i := 0; i < 100; i++ {
+	for i := 0; i < 10; i++ {
 		item := new(Item)
 		item.Name = randomName()
 		item.MainStat = rand.Intn(100)
@@ -122,6 +123,23 @@ func (c *Controller) GetItemByType(t string) []*Item {
 		}
 	}
 	return res
+}
+func (c *Controller) GetUser() *User {
+	return c.data.User
+}
+func (c *Controller) BuyItem(item *Item) bool {
+	if c.data.User.Money < item.Price {
+		return false
+	}
+	c.data.User.Items = append(c.data.User.Items, item)
+	c.data.User.Money -= item.Price
+	return true
+}
+func (c *Controller) SaleItem(index int) bool {
+	item := c.data.User.Items[index]
+	c.data.User.Items = append(c.data.User.Items[:index], c.data.User.Items[index+1:]...)
+	c.data.User.Money += item.Price
+	return true
 }
 
 type GUI struct {
@@ -168,31 +186,99 @@ func (g *GUI) printTable(table [][]string) {
 		fmt.Print("\n")
 	}
 }
+func (g *GUI) printTableWithIndexAndHead(table [][]string, head []string) {
+	newTable := make([][]string, len(table))
+	newHead := append([]string{"index"}, head...)
+	for i, row := range table {
+		newTable[i] = append([]string{strconv.Itoa(i)}, row...)
+	}
+	newTable = append([][]string{newHead}, newTable...)
+	g.printTable(newTable)
+}
 func (g *GUI) getMenuAnsven(v []string, title string, info []string) int {
 	for true {
 		g.printHead(title)
 		g.printList(info, false)
 		g.printList(v, true)
-		if slc, err := strconv.Atoi(g.text()); err == nil {
+		if slc, err := strconv.Atoi(g.text()); err == nil && slc > -1 && slc < len(v) {
 			return slc
 		}
 	}
 	return -1
 }
+func (g *GUI) getTableAnsven(table [][]string, head []string, title string, info []string) int {
+	for true {
+		g.printHead(title)
+		g.printList(info, false)
+		g.printTableWithIndexAndHead(table, head)
+		fmt.Println("press enter to cancel")
+		ans := g.text()
+		if ans == "" {
+			return -1
+		}
+		if slc, err := strconv.Atoi(ans); err == nil && slc > -1 && slc < len(table) {
+			return slc
+		}
+	}
+	return -1
+}
+func (g *GUI) convertItemsToTableAndHead(items []*Item) ([][]string, []string) {
+	head := []string{"name", "type", "main stat", "price"}
+	return g.convertItemsToTable(items), head
+}
 func (g *GUI) convertItemsToTable(items []*Item) [][]string {
-	table := make([][]string, len(items)+1)
-	table[0] = []string{"name", "type", "main stat", "price"}
+	table := make([][]string, len(items))
 	for i, item := range items {
-		table[i+1] = []string{item.Name, item.Type, strconv.Itoa(item.MainStat), strconv.Itoa(item.Price)}
+		table[i] = []string{item.Name, item.Type, strconv.Itoa(item.MainStat), strconv.Itoa(item.Price)}
 	}
 	return table
 }
 func (g *GUI) Run() {
 	for true {
-		ans := g.getMenuAnsven([]string{"exit", "armory", "shop", "battle", "admin"}, "TANK BATTLE", []string{"with GO", VERSION})
+		ans := g.getMenuAnsven(
+			[]string{"exit", "armory", "shop", "battle", "admin"}, "TANK BATTLE", []string{"with GO", VERSION})
 		switch ans {
 		case 0:
 			return
+		case 2:
+			g.shopMenu()
+		}
+	}
+}
+func (g *GUI) printResult(res bool) {
+	if res == true {
+		fmt.Println("SUCCESS")
+	} else {
+		fmt.Println("FAILED")
+	}
+}
+func (g *GUI) shopMenu() {
+	for true {
+		ans := g.getMenuAnsven([]string{"exit", "buy gun", "buy carcase", "sale item"}, "SHOP", []string{"your money", strconv.Itoa(g.controller.GetUser().Money)})
+		switch ans {
+		case 0:
+			return
+		case 1:
+			guns := g.controller.GetItemByType(GUN)
+			table, head := g.convertItemsToTableAndHead(guns)
+			index := g.getTableAnsven(table, head, "BUY GUN", []string{"your money", strconv.Itoa(g.controller.GetUser().Money)})
+			if index != -1 {
+				g.printResult(g.controller.BuyItem(guns[index]))
+			}
+		case 2:
+			carcase := g.controller.GetItemByType(CARCASE)
+			table, head := g.convertItemsToTableAndHead(carcase)
+			index := g.getTableAnsven(table, head, "BUY CARCASE", []string{"your money", strconv.Itoa(g.controller.GetUser().Money)})
+			if index != -1 {
+				g.printResult(g.controller.BuyItem(carcase[index]))
+			}
+		case 3:
+			items := g.controller.GetUser().Items
+			table, head := g.convertItemsToTableAndHead(items)
+			index := g.getTableAnsven(table, head, "BUY CARCASE", []string{"your money", strconv.Itoa(g.controller.GetUser().Money)})
+			if index != -1 {
+				g.printResult(g.controller.SaleItem(index))
+			}
 		}
 	}
 }
@@ -203,5 +289,6 @@ func main() {
 	c.Save()
 	g := NewGUI(c)
 	g.printTable(g.convertItemsToTable(c.GetItemByType(GUN)))
+	g.printTableWithIndexAndHead(g.convertItemsToTableAndHead(c.GetItemByType(CARCASE)))
 	g.Run()
 }
