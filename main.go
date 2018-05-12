@@ -25,12 +25,17 @@ func randomName() string {
 	}
 	return buff.String()
 }
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
 
 type Item struct {
 	Type     string `json:"type"`
 	Name     string `json:"name"`
 	MainStat int    `json:"main"`
-	AddStat  int    `json:"add"`
 	Price    int    `json:"price"`
 }
 type Tank struct {
@@ -95,7 +100,6 @@ func (c *Controller) generateData() {
 		item := new(Item)
 		item.Name = randomName()
 		item.MainStat = rand.Intn(100)
-		item.AddStat = rand.Intn(100)
 		item.Price = rand.Intn(1000)
 		if rand.Float64() < 0.5 {
 			item.Type = GUN
@@ -104,6 +108,15 @@ func (c *Controller) generateData() {
 		}
 		c.data.Items = append(c.data.Items, item)
 	}
+}
+func (c *Controller) GetItemByType(t string) []*Item {
+	res := make([]*Item, 0)
+	for _, item := range c.data.Items {
+		if item.Type == t {
+			res = append(res, item)
+		}
+	}
+	return res
 }
 
 type GUI struct {
@@ -126,13 +139,28 @@ func (g *GUI) printHead(title string) {
 	fmt.Printf("*%s*\n", title)
 	fmt.Println(strings.Repeat("*", len(title)+2))
 }
-func (g GUI) printList(list []string, numerated bool) {
+func (g *GUI) printList(list []string, numerated bool) {
 	for i, s := range list {
 		if numerated {
 			fmt.Printf("%d->%s\n", i, s)
 		} else {
 			fmt.Printf("(%s)\n", s)
 		}
+	}
+}
+func (g *GUI) printTable(table [][]string) {
+	lens := make([]int, len(table[0]))
+	for _, row := range table {
+		for i, cell := range row {
+			lens[i] = max(lens[i], len(cell))
+		}
+	}
+	for _, row := range table {
+		fmt.Print("|")
+		for i, cell := range row {
+			fmt.Printf(" %"+strconv.Itoa(lens[i])+"s |", cell)
+		}
+		fmt.Print("\n")
 	}
 }
 func (g *GUI) getMenuAnsven(v []string, title string, info []string) int {
@@ -146,11 +174,19 @@ func (g *GUI) getMenuAnsven(v []string, title string, info []string) int {
 	}
 	return -1
 }
+func (g *GUI) convertItemsToTable(items []*Item) [][]string {
+	table := make([][]string, len(items))
+	for i, item := range items {
+		table[i] = []string{item.Name, strconv.Itoa(item.MainStat), strconv.Itoa(item.Price)}
+	}
+	return table
+}
 
 func main() {
 	c := NewConroller("db.json")
 	c.generateData()
 	c.Save()
 	g := NewGUI(c)
+	g.printTable(g.convertItemsToTable(c.GetItemByType(GUN)))
 	g.getMenuAnsven([]string{"sel1", "sel2"}, "TB GO", []string{"info1"})
 }
