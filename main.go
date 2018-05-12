@@ -15,6 +15,7 @@ import (
 const (
 	GUN     = "gun"
 	CARCASE = "carcase"
+	VERSION = "v0.0"
 )
 
 func randomName() string {
@@ -44,7 +45,6 @@ type Tank struct {
 	Name    string `json:"name"`
 }
 type User struct {
-	Name  string  `json:"name"`
 	Money int     `json:"money"`
 	Wins  int     `json:"wins"`
 	Loses int     `json:"loses"`
@@ -67,7 +67,9 @@ func NewConroller(filename string) *Controller {
 	return c
 }
 func (c *Controller) Load() {
-	c.load(c.filename)
+	if err := c.load(c.filename); err != nil {
+		c.makeData()
+	}
 }
 func (c *Controller) load(filename string) error {
 	file, err := os.Open(filename)
@@ -90,12 +92,15 @@ func (c *Controller) save(filename string) error {
 	encoder := json.NewEncoder(file)
 	return encoder.Encode(c.data)
 }
-func (c *Controller) generateData() {
+func (c *Controller) makeData() {
 	c.data = new(Data)
-	c.data.User.Name = "NoName"
 	c.data.User.Money = 1000
 	c.data.User.Items = make([]*Item, 0)
 	c.data.User.Tanks = make([]*Tank, 0)
+	c.data.Items = make([]*Item, 0)
+}
+func (c *Controller) generateData() {
+	c.makeData()
 	for i := 0; i < 100; i++ {
 		item := new(Item)
 		item.Name = randomName()
@@ -142,9 +147,9 @@ func (g *GUI) printHead(title string) {
 func (g *GUI) printList(list []string, numerated bool) {
 	for i, s := range list {
 		if numerated {
-			fmt.Printf("%d->%s\n", i, s)
+			fmt.Printf("%d -> %s\n", i, s)
 		} else {
-			fmt.Printf("(%s)\n", s)
+			fmt.Printf("( %s )\n", s)
 		}
 	}
 }
@@ -175,11 +180,21 @@ func (g *GUI) getMenuAnsven(v []string, title string, info []string) int {
 	return -1
 }
 func (g *GUI) convertItemsToTable(items []*Item) [][]string {
-	table := make([][]string, len(items))
+	table := make([][]string, len(items)+1)
+	table[0] = []string{"name", "type", "main stat", "price"}
 	for i, item := range items {
-		table[i] = []string{item.Name, strconv.Itoa(item.MainStat), strconv.Itoa(item.Price)}
+		table[i+1] = []string{item.Name, item.Type, strconv.Itoa(item.MainStat), strconv.Itoa(item.Price)}
 	}
 	return table
+}
+func (g *GUI) Run() {
+	for true {
+		ans := g.getMenuAnsven([]string{"exit", "armory", "shop", "battle", "admin"}, "TANK BATTLE", []string{"with GO", VERSION})
+		switch ans {
+		case 0:
+			return
+		}
+	}
 }
 
 func main() {
@@ -188,5 +203,5 @@ func main() {
 	c.Save()
 	g := NewGUI(c)
 	g.printTable(g.convertItemsToTable(c.GetItemByType(GUN)))
-	g.getMenuAnsven([]string{"sel1", "sel2"}, "TB GO", []string{"info1"})
+	g.Run()
 }
