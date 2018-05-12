@@ -211,7 +211,7 @@ func (g *GUI) getTableAnsven(table [][]string, head []string, title string, info
 		g.printHead(title)
 		g.printList(info, false)
 		g.printTableWithIndexAndHead(table, head)
-		fmt.Println("press enter to cancel")
+		fmt.Println("enter index from 0 to", len(table)-1, "\npress enter to cancel")
 		ans := g.text()
 		if ans == "" {
 			return -1
@@ -275,7 +275,7 @@ func (g *GUI) shopMenu() {
 		case 3:
 			items := g.controller.GetUser().Items
 			table, head := g.convertItemsToTableAndHead(items)
-			index := g.getTableAnsven(table, head, "BUY CARCASE", []string{"your money", strconv.Itoa(g.controller.GetUser().Money)})
+			index := g.getTableAnsven(table, head, "SALE ITEM", []string{"your money", strconv.Itoa(g.controller.GetUser().Money)})
 			if index != -1 {
 				g.printResult(g.controller.SaleItem(index))
 			}
