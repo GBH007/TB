@@ -18,6 +18,15 @@ const (
 	VERSION = "v0.0"
 )
 
+func selectItemByType(items []*Item, t string) []*Item {
+	res := make([]*Item, 0)
+	for _, item := range items {
+		if item.Type == t {
+			res = append(res, item)
+		}
+	}
+	return res
+}
 func randomName() string {
 	val := "qwertyuiopasdfghjklzxcvbnm0123456789"
 	buff := new(bytes.Buffer)
@@ -116,13 +125,7 @@ func (c *Controller) generateData() {
 	}
 }
 func (c *Controller) GetItemByType(t string) []*Item {
-	res := make([]*Item, 0)
-	for _, item := range c.data.Items {
-		if item.Type == t {
-			res = append(res, item)
-		}
-	}
-	return res
+	return selectItemByType(c.data.Items, t)
 }
 func (c *Controller) GetUser() *User {
 	return c.data.User
@@ -240,6 +243,8 @@ func (g *GUI) Run() {
 		switch ans {
 		case 0:
 			return
+		case 1:
+			g.armoryMenu()
 		case 2:
 			g.shopMenu()
 		}
@@ -252,6 +257,30 @@ func (g *GUI) printResult(res bool) {
 		fmt.Println("FAILED")
 	}
 }
+func (g *GUI) armoryMenu() {
+	for true {
+		ans := g.getMenuAnsven(
+			[]string{"exit", "my gun", "my carcase", "my tank"}, "ARMORY",
+			[]string{
+				"wins " + strconv.Itoa(g.controller.GetUser().Wins),
+				"loses " + strconv.Itoa(g.controller.GetUser().Loses)})
+		switch ans {
+		case 0:
+			return
+		case 1:
+			items := selectItemByType(g.controller.GetUser().Items, GUN)
+			table, head := g.convertItemsToTableAndHead(items)
+			g.printTableWithIndexAndHead(table, head)
+		case 2:
+			items := selectItemByType(g.controller.GetUser().Items, CARCASE)
+			table, head := g.convertItemsToTableAndHead(items)
+			g.printTableWithIndexAndHead(table, head)
+		case 3:
+			g.tankEditMenu()
+		}
+	}
+}
+func (g *GUI) tankEditMenu() {}
 func (g *GUI) shopMenu() {
 	for true {
 		ans := g.getMenuAnsven([]string{"exit", "buy gun", "buy carcase", "sale item"}, "SHOP", []string{"your money", strconv.Itoa(g.controller.GetUser().Money)})
@@ -288,7 +317,5 @@ func main() {
 	c.generateData()
 	c.Save()
 	g := NewGUI(c)
-	g.printTable(g.convertItemsToTable(c.GetItemByType(GUN)))
-	g.printTableWithIndexAndHead(g.convertItemsToTableAndHead(c.GetItemByType(CARCASE)))
 	g.Run()
 }
