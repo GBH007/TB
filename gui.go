@@ -121,7 +121,7 @@ func (g *GUI) convertTanksToTableAndHead(tanks map[int]*Tank) ([][]string, []str
 func (g *GUI) Run() {
 	for true {
 		ans := g.getMenuAnswer(
-			[]string{"exit", "armory", "shop", "battle"}, "TANK BATTLE", []string{"with GO", VERSION})
+			[]string{"exit", "armory", "shop", "battle", "admin"}, "TANK BATTLE", []string{"with GO", VERSION})
 		switch ans {
 		case 0:
 			return
@@ -131,6 +131,24 @@ func (g *GUI) Run() {
 			g.shopMenu()
 		case 3:
 			g.battleMenu()
+		case 4:
+			g.adminMenu()
+		}
+	}
+}
+func (g *GUI) adminMenu() {
+	for true {
+		ans := g.getMenuAnswer(
+			[]string{"exit", "generate data", "save", "load"}, "ADMIN", []string{"filename", g.controller.filename})
+		switch ans {
+		case 0:
+			return
+		case 1:
+			g.controller.generateData()
+		case 2:
+			g.controller.Save()
+		case 3:
+			g.controller.Load()
 		}
 	}
 }
