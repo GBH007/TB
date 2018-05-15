@@ -18,11 +18,11 @@ const (
 	VERSION = "v0.0"
 )
 
-func selectItemByType(items []*Item, t string) []*Item {
-	res := make([]*Item, 0)
-	for _, item := range items {
+func selectItemByType(items map[int]*Item, t string) map[int]*Item {
+	res := make(map[int]*Item)
+	for i, item := range items {
 		if item.Type == t {
-			res = append(res, item)
+			res[i] = item
 		}
 	}
 	return res
@@ -54,16 +54,44 @@ type Tank struct {
 	Name    string `json:"name"`
 }
 type User struct {
-	Money int     `json:"money"`
-	Wins  int     `json:"wins"`
-	Loses int     `json:"loses"`
-	Items []*Item `json:"items"`
-	Tanks []*Tank `json:"tanks"`
+	Money      int           `json:"money"`
+	Wins       int           `json:"wins"`
+	Loses      int           `json:"loses"`
+	Items      map[int]*Item `json:"items"`
+	Tanks      map[int]*Tank `json:"tanks"`
+	LastItemId int           `json:"last_item_id"`
+	LastTankId int           `json:"last_tank_id"`
 }
+
+func (u *User) AddItem(item *Item) {
+	u.Items[u.LastItemId] = item
+	u.LastItemId++
+}
+func (u *User) DelItem(index int) {
+	delete(u.Items, index)
+}
+func (u *User) AddTank(tank *Tank) {
+	u.Tanks[u.LastTankId] = tank
+	u.LastTankId++
+}
+func (u *User) DelTank(index int) {
+	delete(u.Tanks, index)
+}
+
 type Data struct {
-	User  *User   `json:"user"`
-	Items []*Item `json:"items"`
+	User       *User         `json:"user"`
+	Items      map[int]*Item `json:"items"`
+	LastItemId int           `json:"last_item_id"`
 }
+
+func (d *Data) AddItem(item *Item) {
+	d.Items[d.LastItemId] = item
+	d.LastItemId++
+}
+func (d *Data) DelItem(index int) {
+	delete(d.Items, index)
+}
+
 type Controller struct {
 	data     *Data
 	filename string
@@ -78,7 +106,6 @@ func NewConroller(filename string) *Controller {
 func (c *Controller) Load() {
 	if err := c.load(c.filename); err != nil {
 		log.Println(err)
-		//c.makeData()
 	}
 }
 func (c *Controller) load(filename string) error {
@@ -107,9 +134,9 @@ func (c *Controller) makeData() {
 	c.data = new(Data)
 	c.data.User = new(User)
 	c.data.User.Money = 1000
-	c.data.User.Items = make([]*Item, 0)
-	c.data.User.Tanks = make([]*Tank, 0)
-	c.data.Items = make([]*Item, 0)
+	c.data.User.Items = make(map[int]*Item)
+	c.data.User.Tanks = make(map[int]*Tank)
+	c.data.Items = make(map[int]*Item)
 }
 func (c *Controller) generateData() {
 	c.makeData()
@@ -123,13 +150,13 @@ func (c *Controller) generateData() {
 		} else {
 			item.Type = CARCASE
 		}
-		c.data.Items = append(c.data.Items, item)
+		c.data.AddItem(item)
 	}
 }
-func (c *Controller) GetItemByType(t string) []*Item {
+func (c *Controller) GetItemByType(t string) map[int]*Item {
 	return selectItemByType(c.data.Items, t)
 }
-func (c *Controller) GetUserItemByType(t string) []*Item {
+func (c *Controller) GetUserItemByType(t string) map[int]*Item {
 	return selectItemByType(c.data.User.Items, t)
 }
 func (c *Controller) GetUser() *User {
@@ -139,36 +166,45 @@ func (c *Controller) BuyItem(item *Item) bool {
 	if c.data.User.Money < item.Price {
 		return false
 	}
-	c.data.User.Items = append(c.data.User.Items, item)
+	c.data.User.AddItem(item)
 	c.data.User.Money -= item.Price
 	return true
 }
 func (c *Controller) SaleItem(index int) bool {
-	item := c.data.User.Items[index]
-	c.data.User.Items = append(c.data.User.Items[:index], c.data.User.Items[index+1:]...)
+	item, ok := c.data.User.Items[index]
+	if !ok {
+		return false
+	}
+	c.data.User.DelItem(index)
 	c.data.User.Money += item.Price
 	return true
 }
-func (c *Controller) GetUserTanks() []*Tank {
+func (c *Controller) GetUserTanks() map[int]*Tank {
 	return c.data.User.Tanks
 }
 func (c *Controller) AssembleTank(gunIndex, carcaseIndex int, name string) bool {
-	gun := c.data.User.Items[gunIndex]
-	carcase := c.data.User.Items[carcaseIndex]
-	items := make([]*Item, 0)
-	for i, item := range c.data.User.Items {
-		if i != gunIndex && i != carcaseIndex {
-			items = append(items, item)
-		}
+	gun, ok := c.data.User.Items[gunIndex]
+	if !ok {
+		return false
 	}
+	carcase, ok := c.data.User.Items[carcaseIndex]
+	if !ok {
+		return false
+	}
+	c.data.User.DelItem(gunIndex)
+	c.data.User.DelItem(carcaseIndex)
 	tank := &Tank{Name: name, Gun: gun, Carcase: carcase}
-	c.data.User.Tanks = append(c.data.User.Tanks, tank)
+	c.data.User.AddTank(tank)
 	return true
 }
 func (c *Controller) DisassembleTank(index int) bool {
-	tank := c.data.User.Tanks[index]
-	c.data.User.Items = append(c.data.User.Items, tank.Gun, tank.Carcase)
-	c.data.User.Tanks = append(c.data.User.Tanks[:index], c.data.User.Tanks[index+1:]...)
+	tank, ok := c.data.User.Tanks[index]
+	if !ok {
+		return false
+	}
+	c.data.User.AddItem(tank.Gun)
+	c.data.User.AddItem(tank.Carcase)
+	c.data.User.DelTank(index)
 	return true
 }
 
@@ -216,13 +252,8 @@ func (g *GUI) printTable(table [][]string) {
 		fmt.Print("\n")
 	}
 }
-func (g *GUI) printTableWithIndexAndHead(table [][]string, head []string) {
-	newTable := make([][]string, len(table))
-	newHead := append([]string{"index"}, head...)
-	for i, row := range table {
-		newTable[i] = append([]string{strconv.Itoa(i)}, row...)
-	}
-	newTable = append([][]string{newHead}, newTable...)
+func (g *GUI) printTableWithHead(table [][]string, head []string) {
+	newTable := append([][]string{head}, table...)
 	g.printTable(newTable)
 }
 func (g *GUI) getMenuAnswer(v []string, title string, info []string) int {
@@ -240,38 +271,39 @@ func (g *GUI) getTableAnswer(table [][]string, head []string, title string, info
 	for true {
 		g.printHead(title)
 		g.printList(info, false)
-		g.printTableWithIndexAndHead(table, head)
-		fmt.Println("enter index from 0 to", len(table)-1, "\npress enter to cancel")
+		g.printTableWithHead(table, head)
+		fmt.Println("enter index\npress enter to cancel")
 		ans := g.text()
 		if ans == "" {
 			return -1
 		}
-		if slc, err := strconv.Atoi(ans); err == nil && slc > -1 && slc < len(table) {
+		if slc, err := strconv.Atoi(ans); err == nil {
 			return slc
 		}
 	}
 	return -1
 }
-func (g *GUI) convertItemsToTableAndHead(items []*Item) ([][]string, []string) {
-	head := []string{"name", "type", "main stat", "price"}
+func (g *GUI) convertItemsToTableAndHead(items map[int]*Item) ([][]string, []string) {
+	head := []string{"index", "name", "type", "main stat", "price"}
 	return g.convertItemsToTable(items), head
 }
-func (g *GUI) convertItemsToTable(items []*Item) [][]string {
-	table := make([][]string, len(items))
+func (g *GUI) convertItemsToTable(items map[int]*Item) [][]string {
+	table := make([][]string, 0)
 	for i, item := range items {
-		table[i] = []string{item.Name, item.Type, strconv.Itoa(item.MainStat), strconv.Itoa(item.Price)}
+		table = append(table, []string{strconv.Itoa(i), item.Name, item.Type, strconv.Itoa(item.MainStat), strconv.Itoa(item.Price)})
 	}
 	return table
 }
-func (g *GUI) convertTanksToTableAndHead(tanks []*Tank) ([][]string, []string) {
-	head := []string{"name", "gun stat", "carcase stat", "price"}
-	table := make([][]string, len(tanks))
+func (g *GUI) convertTanksToTableAndHead(tanks map[int]*Tank) ([][]string, []string) {
+	head := []string{"index", "name", "gun stat", "carcase stat", "price"}
+	table := make([][]string, 0)
 	for i, tank := range tanks {
-		table[i] = []string{
+		table = append(table, []string{
+			strconv.Itoa(i),
 			tank.Name,
 			strconv.Itoa(tank.Gun.MainStat),
 			strconv.Itoa(tank.Carcase.MainStat),
-			strconv.Itoa(tank.Gun.Price + tank.Carcase.Price)}
+			strconv.Itoa(tank.Gun.Price + tank.Carcase.Price)})
 	}
 	return table, head
 }
@@ -307,13 +339,13 @@ func (g *GUI) armoryMenu() {
 		case 0:
 			return
 		case 1:
-			items := selectItemByType(g.controller.GetUser().Items, GUN)
+			items := g.controller.GetUserItemByType(GUN)
 			table, head := g.convertItemsToTableAndHead(items)
-			g.printTableWithIndexAndHead(table, head)
+			g.printTableWithHead(table, head)
 		case 2:
-			items := selectItemByType(g.controller.GetUser().Items, CARCASE)
+			items := g.controller.GetUserItemByType(CARCASE)
 			table, head := g.convertItemsToTableAndHead(items)
-			g.printTableWithIndexAndHead(table, head)
+			g.printTableWithHead(table, head)
 		case 3:
 			g.tankEditMenu()
 		}
@@ -330,7 +362,7 @@ func (g *GUI) tankEditMenu() {
 		case 1:
 			tanks := g.controller.GetUserTanks()
 			table, head := g.convertTanksToTableAndHead(tanks)
-			g.printTableWithIndexAndHead(table, head)
+			g.printTableWithHead(table, head)
 		case 2:
 			guns := g.controller.GetUserItemByType(GUN)
 			table, head := g.convertItemsToTableAndHead(guns)
