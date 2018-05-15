@@ -256,6 +256,15 @@ func (g *GUI) printTableWithHead(table [][]string, head []string) {
 	newTable := append([][]string{head}, table...)
 	g.printTable(newTable)
 }
+func (g *GUI) printTableWithIndexAndHead(table [][]string, head []string) {
+	newTable := make([][]string, len(table))
+	newHead := append([]string{"index"}, head...)
+	for i, row := range table {
+		newTable[i] = append([]string{strconv.Itoa(i)}, row...)
+	}
+	newTable = append([][]string{newHead}, newTable...)
+	g.printTable(newTable)
+}
 func (g *GUI) getMenuAnswer(v []string, title string, info []string) int {
 	for true {
 		g.printHead(title)
@@ -267,11 +276,12 @@ func (g *GUI) getMenuAnswer(v []string, title string, info []string) int {
 	}
 	return -1
 }
-func (g *GUI) getTableAnswer(table [][]string, head []string, title string, info []string) int {
+func (g *GUI) getTableAnswer(table [][]string, head []string, title string, info []string, printer func([][]string, []string)) int {
 	for true {
 		g.printHead(title)
 		g.printList(info, false)
-		g.printTableWithHead(table, head)
+		//g.printTableWithHead(table, head)
+		printer(table, head)
 		fmt.Println("enter index\npress enter to cancel")
 		ans := g.text()
 		if ans == "" {
@@ -310,7 +320,7 @@ func (g *GUI) convertTanksToTableAndHead(tanks map[int]*Tank) ([][]string, []str
 func (g *GUI) Run() {
 	for true {
 		ans := g.getMenuAnswer(
-			[]string{"exit", "armory", "shop", "battle", "admin"}, "TANK BATTLE", []string{"with GO", VERSION})
+			[]string{"exit", "armory", "shop", "battle"}, "TANK BATTLE", []string{"with GO", VERSION})
 		switch ans {
 		case 0:
 			return
@@ -318,7 +328,81 @@ func (g *GUI) Run() {
 			g.armoryMenu()
 		case 2:
 			g.shopMenu()
+		case 3:
+			g.battleMenu()
 		}
+	}
+}
+func (g *GUI) battleMenu() {
+	for true {
+		tanks := g.controller.GetUserTanks()
+		table, head := g.convertTanksToTableAndHead(tanks)
+		index := g.getTableAnswer(table, head, "SELECT TANK", []string{}, g.printTableWithHead)
+		if _, ok := tanks[index]; !ok || index == -1 {
+			return
+		}
+		tank := tanks[index]
+		hp := tank.Carcase.MainStat
+		pw := tank.Gun.MainStat
+		enemys := [][]int{
+			{hp - 10, pw - 10, (hp - 10) * 60 / hp},
+			{hp, pw, 60},
+			{hp + 10, pw + 10, (hp + 10) * 60 / hp},
+			{100, 100, 100 * 60 / hp},
+		}
+		names := []string{"easy", "normal", "hard", "ADMIN"}
+		table = make([][]string, len(enemys))
+		for i, row := range enemys {
+			table[i] = []string{
+				names[i],
+				strconv.Itoa(row[0]),
+				strconv.Itoa(row[1]),
+				strconv.Itoa(row[2]),
+			}
+		}
+		head = []string{"level", "carcase HP", "gun power", "reward"}
+		index = g.getTableAnswer(table, head, "SELECT ENEMY", []string{}, g.printTableWithIndexAndHead)
+		if index == -1 {
+			return
+		}
+		enemy := &Tank{
+			Name:    names[index],
+			Gun:     &Item{MainStat: enemys[index][1]},
+			Carcase: &Item{MainStat: enemys[index][0]},
+		}
+		g.printBattle(tank, enemy, enemys[index][2])
+	}
+}
+func (g *GUI) printBattle(player, enemy *Tank, reward int) {
+	g.printHead("BATTLE!")
+	playerHp := player.Carcase.MainStat
+	enemyHp := enemy.Carcase.MainStat
+	var turn int = 0
+	for true {
+		fmt.Println(strings.Repeat("-", 30))
+		if playerHp < 1 {
+			fmt.Println("You LOSE!!!")
+			return
+		}
+		if enemyHp < 1 {
+			fmt.Println("You WIN!!!")
+			g.controller.GetUser().Money += reward
+			return
+		}
+		r := rand.Intn(3)
+		if turn%2 == 0 {
+			dmg := r * player.Gun.MainStat
+			fmt.Printf("%s loses %d HP\n", enemy.Name, dmg)
+			enemyHp -= dmg
+		} else {
+			dmg := r * enemy.Gun.MainStat
+			fmt.Printf("%s loses %d HP\n", player.Name, dmg)
+			playerHp -= dmg
+		}
+		if r == 2 {
+			fmt.Println("VOT ETO KRIT!!!!!!!!")
+		}
+		turn++
 	}
 }
 func (g *GUI) printResult(res bool) {
@@ -366,13 +450,13 @@ func (g *GUI) tankEditMenu() {
 		case 2:
 			guns := g.controller.GetUserItemByType(GUN)
 			table, head := g.convertItemsToTableAndHead(guns)
-			gunIndex := g.getTableAnswer(table, head, "SELECT GUN", []string{})
+			gunIndex := g.getTableAnswer(table, head, "SELECT GUN", []string{}, g.printTableWithHead)
 			if gunIndex == -1 {
 				continue
 			}
 			carcase := g.controller.GetUserItemByType(CARCASE)
 			table, head = g.convertItemsToTableAndHead(carcase)
-			carcaseIndex := g.getTableAnswer(table, head, "SELECT CARCASE", []string{})
+			carcaseIndex := g.getTableAnswer(table, head, "SELECT CARCASE", []string{}, g.printTableWithHead)
 			if carcaseIndex == -1 {
 				continue
 			}
@@ -385,7 +469,7 @@ func (g *GUI) tankEditMenu() {
 		case 3:
 			tanks := g.controller.GetUserTanks()
 			table, head := g.convertTanksToTableAndHead(tanks)
-			index := g.getTableAnswer(table, head, "SELECT TANK", []string{})
+			index := g.getTableAnswer(table, head, "SELECT TANK", []string{}, g.printTableWithHead)
 			if index != -1 {
 				g.printResult(g.controller.DisassembleTank(index))
 			}
@@ -401,21 +485,21 @@ func (g *GUI) shopMenu() {
 		case 1:
 			guns := g.controller.GetItemByType(GUN)
 			table, head := g.convertItemsToTableAndHead(guns)
-			index := g.getTableAnswer(table, head, "BUY GUN", []string{"your money", strconv.Itoa(g.controller.GetUser().Money)})
+			index := g.getTableAnswer(table, head, "BUY GUN", []string{"your money", strconv.Itoa(g.controller.GetUser().Money)}, g.printTableWithHead)
 			if index != -1 {
 				g.printResult(g.controller.BuyItem(guns[index]))
 			}
 		case 2:
 			carcase := g.controller.GetItemByType(CARCASE)
 			table, head := g.convertItemsToTableAndHead(carcase)
-			index := g.getTableAnswer(table, head, "BUY CARCASE", []string{"your money", strconv.Itoa(g.controller.GetUser().Money)})
+			index := g.getTableAnswer(table, head, "BUY CARCASE", []string{"your money", strconv.Itoa(g.controller.GetUser().Money)}, g.printTableWithHead)
 			if index != -1 {
 				g.printResult(g.controller.BuyItem(carcase[index]))
 			}
 		case 3:
 			items := g.controller.GetUser().Items
 			table, head := g.convertItemsToTableAndHead(items)
-			index := g.getTableAnswer(table, head, "SALE ITEM", []string{"your money", strconv.Itoa(g.controller.GetUser().Money)})
+			index := g.getTableAnswer(table, head, "SALE ITEM", []string{"your money", strconv.Itoa(g.controller.GetUser().Money)}, g.printTableWithHead)
 			if index != -1 {
 				g.printResult(g.controller.SaleItem(index))
 			}
@@ -430,4 +514,5 @@ func main() {
 	c.Load()
 	g := NewGUI(c)
 	g.Run()
+	c.Save()
 }
