@@ -122,3 +122,40 @@ func (c *Controller) DisassembleTank(index int) bool {
 	c.data.User.DelTank(index)
 	return true
 }
+func (c *Controller) AddMoney(val int) {
+	c.data.User.Money += val
+}
+func (c *Controller) Battle(player, enemy *Tank, reward int) *BattleLog {
+	bl := new(BattleLog)
+	playerHp := player.Carcase.MainStat
+	enemyHp := enemy.Carcase.MainStat
+	var turn int = 0
+	for true {
+		if playerHp < 1 {
+			bl.Win = false
+			return bl
+		}
+		if enemyHp < 1 {
+			bl.Win = true
+			c.AddMoney(reward)
+			return bl
+		}
+		r := rand.Intn(3)
+		step := new(StepLog)
+		step.RandomCoeff = r
+		if turn%2 == 0 {
+			dmg := r * player.Gun.MainStat
+			step.Damage = dmg
+			step.TargetName = enemy.Name
+			enemyHp -= dmg
+		} else {
+			dmg := r * enemy.Gun.MainStat
+			step.Damage = dmg
+			step.TargetName = player.Name
+			playerHp -= dmg
+		}
+		bl.AddStep(step)
+		turn++
+	}
+	return bl
+}

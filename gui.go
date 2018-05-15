@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"math/rand"
 	"os"
 	"strconv"
 	"strings"
@@ -81,7 +80,6 @@ func (g *GUI) getTableAnswer(table [][]string, head []string, title string, info
 	for true {
 		g.printHead(title)
 		g.printList(info, false)
-		//g.printTableWithHead(table, head)
 		printer(table, head)
 		fmt.Println("enter index\npress enter to cancel")
 		ans := g.text()
@@ -96,14 +94,17 @@ func (g *GUI) getTableAnswer(table [][]string, head []string, title string, info
 }
 func (g *GUI) convertItemsToTableAndHead(items map[int]*Item) ([][]string, []string) {
 	head := []string{"index", "name", "type", "main stat", "price"}
-	return g.convertItemsToTable(items), head
-}
-func (g *GUI) convertItemsToTable(items map[int]*Item) [][]string {
 	table := make([][]string, 0)
 	for i, item := range items {
-		table = append(table, []string{strconv.Itoa(i), item.Name, item.Type, strconv.Itoa(item.MainStat), strconv.Itoa(item.Price)})
+		table = append(table, []string{
+			strconv.Itoa(i),
+			item.Name,
+			item.Type,
+			strconv.Itoa(item.MainStat),
+			strconv.Itoa(item.Price),
+		})
 	}
-	return table
+	return table, head
 }
 func (g *GUI) convertTanksToTableAndHead(tanks map[int]*Tank) ([][]string, []string) {
 	head := []string{"index", "name", "gun stat", "carcase stat", "price"}
@@ -194,34 +195,18 @@ func (g *GUI) battleMenu() {
 }
 func (g *GUI) printBattle(player, enemy *Tank, reward int) {
 	g.printHead("BATTLE!")
-	playerHp := player.Carcase.MainStat
-	enemyHp := enemy.Carcase.MainStat
-	var turn int = 0
-	for true {
+	bl := g.controller.Battle(player, enemy, reward)
+	for _, step := range bl.Steps {
 		fmt.Println(strings.Repeat("-", 30))
-		if playerHp < 1 {
-			fmt.Println("You LOSE!!!")
-			return
-		}
-		if enemyHp < 1 {
-			fmt.Println("You WIN!!!")
-			g.controller.GetUser().Money += reward
-			return
-		}
-		r := rand.Intn(3)
-		if turn%2 == 0 {
-			dmg := r * player.Gun.MainStat
-			fmt.Printf("%s loses %d HP\n", enemy.Name, dmg)
-			enemyHp -= dmg
-		} else {
-			dmg := r * enemy.Gun.MainStat
-			fmt.Printf("%s loses %d HP\n", player.Name, dmg)
-			playerHp -= dmg
-		}
-		if r == 2 {
+		fmt.Printf("%s loses %d HP\n", step.TargetName, step.Damage)
+		if step.RandomCoeff == 2 {
 			fmt.Println("VOT ETO KRIT!!!!!!!!")
 		}
-		turn++
+	}
+	if bl.Win {
+		fmt.Println("You WIN!!!")
+	} else {
+		fmt.Println("You LOSE!!!")
 	}
 }
 func (g *GUI) printResult(res bool) {

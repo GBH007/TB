@@ -8,7 +8,7 @@ import (
 const (
 	GUN     = "gun"
 	CARCASE = "carcase"
-	VERSION = "v0.0"
+	VERSION = "v0.1"
 )
 
 func selectItemByType(items map[int]*Item, t string) map[int]*Item {
